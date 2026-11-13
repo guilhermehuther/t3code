@@ -1191,6 +1191,9 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
               : undefined
           }
         >
+          {thread.groupPath?.length ? (
+            <Text className="text-xs text-muted-foreground">{thread.groupPath.join(" / ")} / </Text>
+          ) : null}
           {thread.title}
         </Text>
         <View className="flex-row items-center gap-1.5" style={{ minHeight: titleLineHeight }}>

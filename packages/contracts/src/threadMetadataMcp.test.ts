@@ -19,4 +19,12 @@ describe("ThreadMetadataMcpUpdateInput", () => {
       decodeUpdate({ action: "regenerate_title", clientRequestId: "metadata-\udc00" }),
     );
   });
+
+  it("requires a bounded path for group updates", () => {
+    assert.deepEqual(
+      decodeUpdate({ action: "set_group_path", groupPath: ["Work", "Planning"] }).groupPath,
+      ["Work", "Planning"],
+    );
+    assert.throws(() => decodeUpdate({ action: "set_group_path" }));
+  });
 });

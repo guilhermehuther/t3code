@@ -18,6 +18,10 @@ export type ThreadActionMenuId =
   | `snooze:${string}`
   | "unsnooze"
   | "rename"
+  | "rename-group"
+  | "move-out-of-group"
+  | "move-to-group"
+  | `move-to-group:${number}`
   | "regenerate-title"
   | "mark-unread"
   | "share-guest"
@@ -76,6 +80,8 @@ export interface ThreadActionMenuState {
     readonly isActive: boolean;
   } | null;
   readonly isPinned: boolean;
+  readonly isGrouped?: boolean;
+  readonly groupPaths?: ReadonlyArray<ReadonlyArray<string>>;
   readonly isSettled: boolean;
   readonly autoSettleEnabled: boolean;
   readonly isSnoozed: boolean;
@@ -168,6 +174,25 @@ export function buildThreadActionMenuItems(
         ]
       : []),
     { id: "rename", label: "Rename thread", icon: "pencil", separatorBefore: true },
+    ...(state.isGrouped
+      ? [
+          { id: "rename-group" as const, label: "Rename group…", icon: "pencil" },
+          { id: "move-out-of-group" as const, label: "Move out of group", icon: "folder-open" },
+        ]
+      : []),
+    ...(state.groupPaths?.length
+      ? [
+          {
+            id: "move-to-group" as const,
+            label: "Move to group",
+            icon: "folder-open",
+            children: state.groupPaths.map((path, index) => ({
+              id: `move-to-group:${index}` as const,
+              label: path.join(" / "),
+            })),
+          },
+        ]
+      : []),
     ...(state.supports.titleRegeneration
       ? [
           {

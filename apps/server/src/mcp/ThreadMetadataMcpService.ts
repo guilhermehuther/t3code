@@ -79,6 +79,13 @@ function metadataCommand(input: {
         threadId: input.threadId,
         regenerateTitle: true,
       };
+    case "set_group_path":
+      return {
+        type: "thread.metadata.update",
+        commandId: input.commandId,
+        threadId: input.threadId,
+        groupPath: input.update.groupPath!,
+      };
   }
 }
 

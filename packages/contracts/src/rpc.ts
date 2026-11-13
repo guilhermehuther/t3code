@@ -5,6 +5,12 @@ import {
   OrchestrationV2SearchThreadsInput,
   OrchestrationV2SearchThreadsResult,
 } from "./orchestrationV2.ts";
+import {
+  THREAD_GROUP_NAME_WS_METHOD,
+  SuggestThreadGroupNameError,
+  SuggestThreadGroupNameInput,
+  SuggestThreadGroupNameResult,
+} from "./threadGroupNameSuggestion.ts";
 import { OrchestrationDispatchCommandError } from "./orchestrationDispatch.ts";
 import {
   McpAppCallToolInput,
@@ -1864,6 +1870,12 @@ const WsOrchestrationV2GetThreadTitlesRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS
   error: Schema.Union([OrchestrationV2GetShellSnapshotError, EnvironmentAuthorizationError]),
 });
 
+const WsSuggestThreadGroupNameRpc = Rpc.make(THREAD_GROUP_NAME_WS_METHOD, {
+  payload: SuggestThreadGroupNameInput,
+  success: SuggestThreadGroupNameResult,
+  error: Schema.Union([SuggestThreadGroupNameError, EnvironmentAuthorizationError]),
+});
+
 const WsOrchestrationV2GetThreadLinkMetadataRpc = Rpc.make(
   ORCHESTRATION_V2_WS_METHODS.getThreadLinkMetadata,
   {
@@ -2314,6 +2326,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2GetArchivedShellSnapshotRpc,
   WsOrchestrationV2GetThreadFamilyRpc,
   WsOrchestrationV2GetThreadTitlesRpc,
+  WsSuggestThreadGroupNameRpc,
   WsOrchestrationV2GetThreadLinkMetadataRpc,
   WsOrchestrationV2GetWorktreeThreadIdsRpc,
   WsOrchestrationV2GetOlderSettledThreadsRpc,

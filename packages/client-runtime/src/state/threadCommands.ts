@@ -1,4 +1,9 @@
-import { CommandId, type ModelSelection, type ThreadId } from "@t3tools/contracts";
+import {
+  CommandId,
+  THREAD_GROUP_NAME_WS_METHOD,
+  type ModelSelection,
+  type ThreadId,
+} from "@t3tools/contracts";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -153,6 +158,10 @@ export function createThreadEnvironmentAtoms<R, E>(
   });
 
   const sent = {
+    generateThreadGroupName: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:commands:thread-group:suggest-name",
+      tag: THREAD_GROUP_NAME_WS_METHOD,
+    }),
     armTitleRegeneration: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:regenerate-title",
       execute: armTitleRegeneration,

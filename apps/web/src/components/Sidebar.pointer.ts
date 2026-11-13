@@ -23,11 +23,13 @@ export class SidebarPointerSensor {
   autoScrollEnabled = true;
   private phase: "pending" | "dragging" | "finished" = "pending";
   private readonly pointer: PointerEvent;
+  private point: { x: number; y: number };
   private readonly document: Document;
   private readonly window: Window;
 
   constructor(private readonly props: Omit<SensorProps<Options>, "activeNode" | "context">) {
     this.pointer = props.event as PointerEvent;
+    this.point = { x: this.pointer.clientX, y: this.pointer.clientY };
     this.document = getOwnerDocument(this.pointer.target);
     this.window = getWindow(this.pointer.target);
     this.document.addEventListener("pointermove", this.move, { passive: false, capture: true });
@@ -45,6 +47,7 @@ export class SidebarPointerSensor {
   }
 
   private coordinates = () => ({ x: this.pointer.clientX, y: this.pointer.clientY });
+  currentCoordinates = () => this.point;
   private preventDefault = (event: Event) => event.preventDefault();
   private clearClickSuppression = () => {
     this.document.removeEventListener("click", this.suppressClick, { capture: true });
@@ -59,6 +62,7 @@ export class SidebarPointerSensor {
   private move = (event: PointerEvent) => {
     if (this.phase === "finished" || event.pointerId !== this.pointer.pointerId) return;
     const coordinates = { x: event.clientX, y: event.clientY };
+    this.point = coordinates;
     // Desktop may report buttons=0 before pointerup: a pending press is released like pointerup so its
     // click lands; an active drag drops context before cancelling sort.
     if ((event.buttons & 1) === 0) {
@@ -95,6 +99,7 @@ export class SidebarPointerSensor {
 
   private end = (event: PointerEvent) => {
     if (event.pointerId !== this.pointer.pointerId) return;
+    this.point = { x: event.clientX, y: event.clientY };
     const dropped =
       this.phase === "dragging" &&
       this.props.options.onDrop?.({ x: event.clientX, y: event.clientY }) === true;

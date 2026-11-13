@@ -3191,6 +3191,20 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         DateTime.toEpochMillis(taggedShell.updatedAt),
         DateTime.toEpochMillis(untaggedShell.updatedAt),
       );
+      yield* orchestrator.dispatch({
+        type: "thread.metadata.update",
+        commandId: CommandId.make("runtime-layer-lifecycle-group-path"),
+        threadId,
+        groupPath: ["Work", "Planning"],
+      });
+      assert.deepEqual((yield* orchestrator.getThreadProjection(threadId)).thread.groupPath, [
+        "Work",
+        "Planning",
+      ]);
+      assert.deepEqual(shellOf(yield* orchestrator.getShellSnapshot()).groupPath, [
+        "Work",
+        "Planning",
+      ]);
 
       const preAutoProjection = yield* orchestrator.getThreadProjection(threadId);
       const staleAutoSettle = yield* orchestrator
