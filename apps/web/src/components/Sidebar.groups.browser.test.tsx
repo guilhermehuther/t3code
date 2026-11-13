@@ -2,9 +2,11 @@ import { createMemoryHistory } from "@tanstack/react-router";
 import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts/settings";
 import type * as Context from "effect/Context";
 import { expect, it, vi } from "vite-plus/test";
-import { page } from "vite-plus/test/browser";
+import { page, userEvent } from "vite-plus/test/browser";
+import { useState } from "react";
 
 import { AppRoot } from "~/AppRoot";
+import { SidebarThreadGroupRow } from "~/components/sidebar/SidebarThreadGroupRow";
 import "~/index.css";
 import "~/components/ChatView";
 import { __setClientSettingsForTests } from "~/hooks/useSettings";
@@ -17,6 +19,42 @@ import {
   type FakeDriver,
 } from "../../test/fakeEnvironment";
 import { act, fakeTimers, render } from "../../test/render";
+
+function InlineGroupRowHarness(props: { onCommit: () => void }) {
+  const [name, setName] = useState("New group");
+  const [draft, setDraft] = useState(name);
+  const [editing, setEditing] = useState(true);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(name);
+          setEditing(true);
+        }}
+      >
+        Edit again
+      </button>
+      <ul>
+        <SidebarThreadGroupRow
+          name={name}
+          editingName={editing ? draft : undefined}
+          onEditingNameChange={setDraft}
+          onCommitRename={() => {
+            props.onCommit();
+            setName(draft);
+            setEditing(false);
+          }}
+          onCancelRename={() => {
+            setDraft(name);
+            setEditing(false);
+          }}
+          onOpen={() => {}}
+        />
+      </ul>
+    </>
+  );
+}
 
 vi.mock("../../../../packages/client-runtime/src/connection/driver.ts", async (importOriginal) => {
   const [actual, { fakeDriver }, Layer] = await Promise.all([
@@ -166,4 +204,35 @@ it("groups active threads when dropped on a row center and highlights the target
   await expect
     .element(page.getByText(/Turn off the Working section in General settings/))
     .toBeVisible();
+});
+
+it("selects a new group name and saves Enter while Escape keeps the default", async () => {
+  const onCommit = vi.fn();
+  const container = document.createElement("div");
+  container.style.width = "270px";
+  await using _screen = await render(<InlineGroupRowHarness onCommit={onCommit} />, {
+    container,
+    router: false,
+  });
+  const editor = page.getByRole("textbox", { name: "New group name" });
+  await expect.element(editor).toBeVisible();
+  expect(document.activeElement).toBe(editor.element());
+  expect((editor.element() as HTMLInputElement).selectionStart).toBe(0);
+  expect((editor.element() as HTMLInputElement).selectionEnd).toBe("New group".length);
+  await editor.fill("Discard this name");
+  await userEvent.keyboard("{Escape}");
+  await expect.element(page.getByRole("button", { name: "Open group New group" })).toBeVisible();
+  expect(onCommit).not.toHaveBeenCalled();
+
+  await page.getByRole("button", { name: "Edit again" }).click();
+  const nextEditor = page.getByRole("textbox", { name: "New group name" });
+  await expect.element(nextEditor).toBeVisible();
+  await nextEditor.fill("");
+  await userEvent.keyboard("{Enter}");
+  expect(onCommit).not.toHaveBeenCalled();
+  await nextEditor.fill("Saved notes");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(page.getByRole("button", { name: "Open group Saved notes" })).toBeVisible();
+  expect(onCommit).toHaveBeenCalledTimes(1);
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
 });

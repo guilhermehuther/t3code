@@ -282,6 +282,7 @@ import {
   type SidebarProviderEntry,
   type SidebarSweepAction,
 } from "./sidebar/SidebarThreadRow";
+import { SidebarThreadGroupRow } from "./sidebar/SidebarThreadGroupRow";
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarProjectFolderHeader,
@@ -1079,6 +1080,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectId: ProjectId;
     path: string[];
     name: string;
+    inline?: boolean;
+    scopeKey?: string | null;
   } | null>(null);
   const [generatingGroupName, setGeneratingGroupName] = useState(false);
   const renamingOriginalTitleRef = useRef("");
@@ -1118,6 +1121,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   // A selection made under one scope can hold threads the next scope hides.
   // The viewport outlives the scope and does not anchor, so a new list starts at the top.
   const setProjectScopeKeys = (keys: readonly string[]) => {
+    setGroupRename(null);
     clearSelection();
     setPersistedProjectScopeKeys(keys);
     scrollSidebarToTop(sidebarContentRef.current);
@@ -1194,6 +1198,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const groupPathForScope = (scopeKey: string | null) =>
     threadGroupNavigation.scopeKey === scopeKey ? threadGroupNavigation.path : [];
   const activeGroupPath = threadGroupsEnabled ? groupPathForScope(projectScopeKey) : [];
+  const navigateThreadGroup = (scopeKey: string | null, path: string[]) => {
+    setGroupRename((current) => (current?.inline ? null : current));
+    setThreadGroupNavigation({ scopeKey, path });
+  };
   const toggleProjectScopeKey = (key: string) =>
     setProjectScopeKeys(
       projectScopeKeys.includes(key)
@@ -2281,7 +2289,25 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               }),
             );
           }
+          return;
         }
+        const scopeKey =
+          projectFolders?.find((folder) =>
+            folder.group.memberProjectRefs.some(
+              (ref) =>
+                ref.environmentId === activeThread.environmentId &&
+                ref.projectId === activeThread.projectId,
+            ),
+          )?.group.projectKey ?? projectScopeKey;
+        setThreadGroupNavigation({ scopeKey, path: path.slice(0, -1) });
+        setGroupRename({
+          environmentId: activeThread.environmentId,
+          projectId: activeThread.projectId,
+          path,
+          name: path.at(-1) ?? targetThread.title,
+          inline: true,
+          scopeKey,
+        });
       })();
       return;
     }
@@ -2326,6 +2352,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       key: activeKey,
       sourceSection: activeSection,
       section: target.section,
+      // oxlint-disable-next-line react/purity -- read when the user completes the drag, not during render
       occurredAt: new Date().toISOString(),
       clearsSnooze:
         plan.kind === "pin" ||
@@ -3208,10 +3235,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       ? shortcutLabelForCommand(keybindings, "chat.newLocal")
       : undefined);
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
-  const commitGroupRename = async () => {
-    if (!threadGroupsEnabled || groupRename === null || groupRename.name.trim() === "") return;
-    const { environmentId, projectId, path: oldPath } = groupRename;
-    if (groupRename.name.trim() === oldPath.at(-1)) {
+  const commitGroupRename = async (rename = groupRename) => {
+    if (!threadGroupsEnabled || rename === null || rename.name.trim() === "") return;
+    const { environmentId, projectId, path: oldPath } = rename;
+    if (rename.name.trim() === oldPath.at(-1)) {
       setGroupRename(null);
       return;
     }
@@ -3224,7 +3251,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         (path) =>
           !(path.length === oldPath.length && path.every((part, index) => part === oldPath[index])),
       );
-    const nextPath = folderPathForDrop(oldPath.slice(0, -1), groupRename.name, siblingPaths);
+    const nextPath = folderPathForDrop(oldPath.slice(0, -1), rename.name.trim(), siblingPaths);
     if (nextPath === null) return;
     const members = projectThreads.filter(
       (thread) =>
@@ -3871,12 +3898,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                   <button
                                     type="button"
                                     className="cursor-pointer hover:text-sidebar-foreground"
-                                    onClick={() =>
-                                      setThreadGroupNavigation({
-                                        scopeKey: folder.group.projectKey,
-                                        path: [],
-                                      })
-                                    }
+                                    onClick={() => navigateThreadGroup(folder.group.projectKey, [])}
                                   >
                                     {folder.group.displayName}
                                   </button>
@@ -3890,10 +3912,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                         type="button"
                                         className="cursor-pointer hover:text-sidebar-foreground"
                                         onClick={() =>
-                                          setThreadGroupNavigation({
-                                            scopeKey: folder.group.projectKey,
-                                            path: folderPath.slice(0, index + 1),
-                                          })
+                                          navigateThreadGroup(
+                                            folder.group.projectKey,
+                                            folderPath.slice(0, index + 1),
+                                          )
                                         }
                                       >
                                         {name}
@@ -3904,28 +3926,32 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               );
                             }
                             for (const name of folderView.folders) {
+                              const groupPath = [...folderPath, name];
+                              const editingGroup =
+                                groupRename?.inline === true &&
+                                folder.group.memberProjectRefs.some(
+                                  (ref) =>
+                                    ref.environmentId === groupRename.environmentId &&
+                                    ref.projectId === groupRename.projectId,
+                                ) &&
+                                groupRename.path.length === groupPath.length &&
+                                groupRename.path.every((part, index) => part === groupPath[index]);
                               items.push(
-                                <li
+                                <SidebarThreadGroupRow
                                   key={`project-thread-group:${folder.group.projectKey}:${[...folderPath, name].join("/")}`}
-                                >
-                                  <button
-                                    type="button"
-                                    aria-label={`Open group ${name}`}
-                                    className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-sidebar-row-hover"
-                                    onClick={() =>
-                                      setThreadGroupNavigation({
-                                        scopeKey: folder.group.projectKey,
-                                        path: [...folderPath, name],
-                                      })
-                                    }
-                                  >
-                                    <FolderIcon
-                                      aria-hidden
-                                      className="size-4 text-sidebar-muted-foreground"
-                                    />
-                                    <span className="truncate">{name}</span>
-                                  </button>
-                                </li>,
+                                  name={name}
+                                  editingName={editingGroup ? groupRename.name : undefined}
+                                  onEditingNameChange={(value) =>
+                                    setGroupRename((current) =>
+                                      current?.inline ? { ...current, name: value } : current,
+                                    )
+                                  }
+                                  onCommitRename={() => void commitGroupRename(groupRename)}
+                                  onCancelRename={() => setGroupRename(null)}
+                                  onOpen={() => {
+                                    navigateThreadGroup(folder.group.projectKey, groupPath);
+                                  }}
+                                />,
                               );
                             }
                             for (const thread of folderView.threads) {
@@ -3953,12 +3979,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 <button
                                   type="button"
                                   className="cursor-pointer hover:text-sidebar-foreground"
-                                  onClick={() =>
-                                    setThreadGroupNavigation({
-                                      scopeKey: projectScopeKey,
-                                      path: [],
-                                    })
-                                  }
+                                  onClick={() => navigateThreadGroup(projectScopeKey, [])}
                                 >
                                   Threads
                                 </button>
@@ -3972,10 +3993,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                       type="button"
                                       className="cursor-pointer hover:text-sidebar-foreground"
                                       onClick={() =>
-                                        setThreadGroupNavigation({
-                                          scopeKey: projectScopeKey,
-                                          path: activeGroupPath.slice(0, index + 1),
-                                        })
+                                        navigateThreadGroup(
+                                          projectScopeKey,
+                                          activeGroupPath.slice(0, index + 1),
+                                        )
                                       }
                                     >
                                       {name}
@@ -3986,26 +4007,35 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             );
                           }
                           for (const name of activeGroupView.folders) {
+                            const groupPath = [...activeGroupPath, name];
+                            const editingGroup =
+                              groupRename?.inline === true &&
+                              activeGroupView.threads.some(
+                                (thread) =>
+                                  thread.environmentId === groupRename.environmentId &&
+                                  thread.projectId === groupRename.projectId &&
+                                  groupPath.every(
+                                    (part, index) => thread.groupPath?.[index] === part,
+                                  ),
+                              ) &&
+                              groupRename.path.length === groupPath.length &&
+                              groupRename.path.every((part, index) => part === groupPath[index]);
                             items.push(
-                              <li key={`thread-group:${[...activeGroupPath, name].join("/")}`}>
-                                <button
-                                  type="button"
-                                  aria-label={`Open group ${name}`}
-                                  className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-sidebar-row-hover"
-                                  onClick={() =>
-                                    setThreadGroupNavigation({
-                                      scopeKey: projectScopeKey,
-                                      path: [...activeGroupPath, name],
-                                    })
-                                  }
-                                >
-                                  <FolderIcon
-                                    aria-hidden
-                                    className="size-4 text-sidebar-muted-foreground"
-                                  />
-                                  <span className="truncate">{name}</span>
-                                </button>
-                              </li>,
+                              <SidebarThreadGroupRow
+                                key={`thread-group:${groupPath.join("/")}`}
+                                name={name}
+                                editingName={editingGroup ? groupRename.name : undefined}
+                                onEditingNameChange={(value) =>
+                                  setGroupRename((current) =>
+                                    current?.inline ? { ...current, name: value } : current,
+                                  )
+                                }
+                                onCommitRename={() => void commitGroupRename(groupRename)}
+                                onCancelRename={() => setGroupRename(null)}
+                                onOpen={() => {
+                                  navigateThreadGroup(projectScopeKey, groupPath);
+                                }}
+                              />,
                             );
                           }
                         }
@@ -4154,7 +4184,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       </SidebarContent>
       <SidebarChromeFooter />
       <Dialog
-        open={threadGroupsEnabled && groupRename !== null}
+        open={threadGroupsEnabled && groupRename !== null && !groupRename.inline}
         onOpenChange={(open) => !open && setGroupRename(null)}
       >
         <DialogPopup>
