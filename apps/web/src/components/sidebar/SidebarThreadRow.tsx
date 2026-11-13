@@ -557,6 +557,7 @@ type SidebarThreadRowProps = {
   dropVerb: SidebarDropVerb | null;
   dragOverPinned: boolean;
   dragOverGroup?: boolean;
+  showGroupPath: boolean;
   sweepAction: SidebarSweepAction | null;
   snoozeWakeLabelText: string | null;
   wokeAt: string | null;
@@ -1068,7 +1069,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       )}
       dir={textDirection(thread.title)}
     >
-      {thread.groupPath?.length ? (
+      {props.showGroupPath && thread.groupPath?.length ? (
         <span className="mr-1 text-secondary-label/65">{thread.groupPath.join(" / ")} /</span>
       ) : null}
       {thread.title}
@@ -1076,7 +1077,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   );
   const accessibleTitle = isRenaming ? null : (
     <span className="sr-only">
-      {thread.groupPath?.length ? `${thread.groupPath.join(" / ")} / ` : ""}
+      {props.showGroupPath && thread.groupPath?.length ? `${thread.groupPath.join(" / ")} / ` : ""}
       {thread.title}
     </span>
   );

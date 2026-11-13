@@ -221,6 +221,7 @@ export interface FakeThread {
   readonly olderSettled?: true;
   readonly id: ThreadId;
   readonly title: string;
+  readonly groupPath?: ReadonlyArray<string>;
   /** Defaults to GPT-5.4 on Codex. */
   readonly modelSelection?: ModelSelection;
   /** The first is the thread's active provider thread. */
@@ -263,6 +264,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
     id: thread.id,
     projectId: PROJECT_ID,
     title: thread.title,
+    ...(thread.groupPath === undefined ? {} : { groupPath: thread.groupPath }),
     providerInstanceId: modelSelection.instanceId,
     modelSelection,
     runtimeMode: "full-access",

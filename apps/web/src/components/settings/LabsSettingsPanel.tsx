@@ -19,6 +19,7 @@ export function LabsSettingsPanel() {
     <SettingsPageContainer>
       <SettingsSection id="beta" title="Beta">
         <BoringSidebarRow />
+        <ThreadGroupsRow />
         {/* Clerk is only mounted when this build has T3 Connect. */}
         {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
         <LinkedEnvironmentsRow />
@@ -51,6 +52,29 @@ function BoringSidebarRow() {
         </div>
       ) : null}
     </SettingsRow>
+  );
+}
+
+function ThreadGroupsRow() {
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsRow
+      {...searchableSetting("thread-groups")}
+      description={
+        settings.sidebarWorkingShelfEnabled
+          ? "This experiment uses manual sidebar ordering. Turn off the Working section in General settings to use it."
+          : "Use nested thread groups with manual sidebar ordering."
+      }
+      control={
+        <Switch
+          checked={settings.threadGroupsEnabled}
+          disabled={settings.sidebarWorkingShelfEnabled}
+          onCheckedChange={(checked) => updateSettings({ threadGroupsEnabled: Boolean(checked) })}
+          aria-label="Thread groups (experimental)"
+        />
+      }
+    />
   );
 }
 

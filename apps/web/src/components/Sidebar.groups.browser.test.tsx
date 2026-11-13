@@ -39,10 +39,13 @@ it("groups active threads when dropped on a row center and highlights the target
     threadWithHistory("group-source", 1),
     threadWithHistory("group-target", 1),
   ];
-  using _environment = installFakeEnvironment([source, target], { acceptCommands: true });
+  const saved = { ...threadWithHistory("saved-group-member", 1), groupPath: ["Saved"] };
+  using _environment = installFakeEnvironment([source, target, saved], { acceptCommands: true });
   __setClientSettingsForTests({
     ...DEFAULT_CLIENT_SETTINGS,
     boringSidebarEnabled: true,
+    sidebarWorkingShelfEnabled: false,
+    threadGroupsEnabled: true,
     onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
   });
   const router = getRouter(
@@ -59,8 +62,11 @@ it("groups active threads when dropped on a row center and highlights the target
     await projectFolder.click();
   }
   await expect.element(projectFolder).toHaveAttribute("aria-expanded", "true");
+  const savedGroup = page.getByRole("button", { name: "Open group Saved" });
+  await expect.element(savedGroup).toBeVisible();
   const sourceRow = page.getByTestId("sidebar-row-folder").filter({ hasText: source.title });
   const targetRow = page.getByTestId("sidebar-row-folder").filter({ hasText: target.title });
+  const savedRow = page.getByTestId("sidebar-row-folder").filter({ hasText: saved.title });
   await expect.element(sourceRow).toBeVisible();
   await expect.element(targetRow).toBeVisible();
   await vi.advanceTimersByTimeAsync(500);
@@ -77,11 +83,11 @@ it("groups active threads when dropped on a row center and highlights the target
     x: targetBounds.left + targetBounds.width / 2,
     y: targetBounds.top + targetBounds.height / 2,
   };
-  const pointer = (type: string, x: number, y: number) =>
+  const pointer = (type: string, x: number, y: number, pointerId = 2) =>
     new PointerEvent(type, {
       bubbles: true,
       cancelable: true,
-      pointerId: 2,
+      pointerId,
       isPrimary: true,
       button: 0,
       buttons: type === "pointerup" ? 0 : 1,
@@ -103,4 +109,61 @@ it("groups active threads when dropped on a row center and highlights the target
         ).length,
     )
     .toBe(2);
+  await savedGroup.click();
+  await expect.element(savedRow).toBeVisible();
+  expect(savedRow.element().textContent).toContain("Saved");
+  await router.navigate({ to: "/settings/labs" });
+  const groupsToggle = page.getByRole("switch", { name: "Thread groups (experimental)" });
+  await expect.element(groupsToggle).toBeChecked();
+  await groupsToggle.click();
+  await expect.element(groupsToggle).not.toBeChecked();
+  router.history.push(`/${ENVIRONMENT_ID}/${source.id}`);
+  await router.load();
+  await expect.element(sourceRow).toBeVisible();
+  await expect.element(savedRow).toBeVisible();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(sourceRow.element().textContent).not.toContain("Saved");
+  expect(savedRow.element().textContent).not.toContain("Saved");
+  await expect
+    .element(page.getByRole("button", { name: "Open group Saved" }))
+    .not.toBeInTheDocument();
+  await expect.element(savedRow).toBeVisible();
+  expect(savedRow.element().textContent).not.toContain("Saved");
+  const disabledTargetBounds = targetRow.element().getBoundingClientRect();
+  const disabledSourceBounds = sourceRow.element().getBoundingClientRect();
+  const disabledStart = {
+    x: disabledSourceBounds.left + disabledSourceBounds.width / 2,
+    y: disabledSourceBounds.top + disabledSourceBounds.height / 2,
+  };
+  const disabledEnd = {
+    x: disabledTargetBounds.left + disabledTargetBounds.width / 2,
+    y: disabledTargetBounds.top + disabledTargetBounds.height / 2,
+  };
+  await act(() => {
+    sourceRow.element().dispatchEvent(pointer("pointerdown", disabledStart.x, disabledStart.y, 3));
+    document.dispatchEvent(pointer("pointermove", disabledEnd.x, disabledEnd.y, 3));
+  });
+  await act(() => document.dispatchEvent(pointer("pointermove", disabledEnd.x, disabledEnd.y, 3)));
+  await expect.element(targetRow).not.toHaveAttribute("data-drop-into-group", "true");
+  await act(() => document.dispatchEvent(pointer("pointerup", disabledEnd.x, disabledEnd.y, 3)));
+  expect(saved.groupPath).toEqual(["Saved"]);
+  expect(
+    dispatchedCommands().filter(
+      (command) =>
+        command.type === "thread.metadata.update" &&
+        command.threadId === saved.id &&
+        command.groupPath !== undefined,
+    ),
+  ).toHaveLength(0);
+  router.history.push("/settings/general");
+  await router.load();
+  const workingToggle = page.getByRole("switch", { name: "Working section" });
+  await expect.element(workingToggle).not.toBeChecked();
+  await workingToggle.click();
+  router.history.push("/settings/labs");
+  await router.load();
+  await expect.element(groupsToggle).toBeDisabled();
+  await expect
+    .element(page.getByText(/Turn off the Working section in General settings/))
+    .toBeVisible();
 });

@@ -115,6 +115,15 @@ describe("storage cleanup settings", () => {
   });
 });
 
+describe("experimental thread groups setting", () => {
+  it("defaults off and accepts client-side patches", () => {
+    expect(decodeClientSettings({}).threadGroupsEnabled).toBe(false);
+    expect(decodeClientSettingsPatch({ threadGroupsEnabled: true })).toEqual({
+      threadGroupsEnabled: true,
+    });
+  });
+});
+
 describe("ServerSettings usage price overrides", () => {
   const prices = { inputCostPerMillionTokens: 2, outputCostPerMillionTokens: 8 };
 
