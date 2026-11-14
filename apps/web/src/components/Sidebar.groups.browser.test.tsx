@@ -24,6 +24,14 @@ function InlineGroupRowHarness(props: { onCommit: () => void }) {
   const [name, setName] = useState("New group");
   const [draft, setDraft] = useState(name);
   const [editing, setEditing] = useState(true);
+  const previewThreads = [
+    { id: "preview-research", title: "Research notes" },
+    { id: "preview-launch", title: "Launch plan" },
+    ...Array.from({ length: 8 }, (_, index) => ({
+      id: `preview-thread-${index}`,
+      title: `Thread ${index}`,
+    })),
+  ];
   return (
     <>
       <button
@@ -38,6 +46,7 @@ function InlineGroupRowHarness(props: { onCommit: () => void }) {
       <ul>
         <SidebarThreadGroupRow
           name={name}
+          previewThreads={previewThreads}
           editingName={editing ? draft : undefined}
           onEditingNameChange={setDraft}
           onCommitRename={() => {
@@ -216,6 +225,9 @@ it("selects a new group name and saves Enter while Escape keeps the default", as
   });
   const editor = page.getByRole("textbox", { name: "New group name" });
   await expect.element(editor).toBeVisible();
+  await expect.element(page.getByText("RN")).toBeVisible();
+  await expect.element(page.getByText("LP")).toBeVisible();
+  expect(container.querySelectorAll("[data-group-preview]")).toHaveLength(9);
   expect(document.activeElement).toBe(editor.element());
   expect((editor.element() as HTMLInputElement).selectionStart).toBe(0);
   expect((editor.element() as HTMLInputElement).selectionEnd).toBe("New group".length);

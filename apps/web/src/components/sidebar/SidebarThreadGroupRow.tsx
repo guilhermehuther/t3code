@@ -1,24 +1,24 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
-function FolderGlyph() {
-  return (
-    <svg aria-hidden="true" className="size-4 shrink-0 text-info" viewBox="0 0 20 16" fill="none">
-      <path
-        d="M1 3.25A1.75 1.75 0 0 1 2.75 1.5h4.1l1.7 1.8h8.7A1.75 1.75 0 0 1 19 5.05v8.2A1.75 1.75 0 0 1 17.25 15H2.75A1.75 1.75 0 0 1 1 13.25v-10Z"
-        fill="currentColor"
-        opacity=".82"
-      />
-      <path
-        d="M1.3 5.1h17.4v8.15a1.4 1.4 0 0 1-1.4 1.4H2.7a1.4 1.4 0 0 1-1.4-1.4V5.1Z"
-        fill="currentColor"
-      />
-      <path d="M2.1 5.2h15.8" stroke="currentColor" strokeOpacity=".45" strokeWidth=".7" />
-    </svg>
-  );
+const previewColors = [
+  "bg-info/18 text-info-foreground",
+  "bg-success/18 text-success-foreground",
+  "bg-warning/18 text-warning-foreground",
+  "bg-accent text-accent-foreground",
+  "bg-secondary text-secondary-foreground",
+  "bg-muted text-muted-foreground",
+];
+
+function threadInitials(title: string) {
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  return words.length > 1
+    ? `${words[0]![0]}${words[1]![0]}`.toUpperCase()
+    : (words[0]?.slice(0, 2) ?? "?").toUpperCase();
 }
 
 export function SidebarThreadGroupRow(props: {
   name: string;
+  previewThreads: ReadonlyArray<{ id: string; title: string; icon?: ReactNode }>;
   onOpen: () => void;
   editingName?: string | undefined;
   onEditingNameChange?: (name: string) => void;
@@ -28,6 +28,7 @@ export function SidebarThreadGroupRow(props: {
   const inputRef = useRef<HTMLInputElement>(null);
   const finishedRef = useRef(false);
   const editing = props.editingName !== undefined;
+  const previews = props.previewThreads.slice(0, 9);
 
   // Focus and select the newly created folder name in the DOM when inline edit mounts.
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync
@@ -38,15 +39,31 @@ export function SidebarThreadGroupRow(props: {
   }, [editing]);
 
   return (
-    <li className="group/thread-folder flex h-8 min-w-0 items-center rounded-md px-2 hover:bg-sidebar-row-hover focus-within:bg-sidebar-row-hover">
+    <li className="flex min-h-[108px] min-w-0 items-center justify-center py-1">
       {editing ? (
-        <>
-          <FolderGlyph />
-          {/* Shared Input is sized for form fields; this editor must fit the compact 32px sidebar row. */}
+        <div className="flex w-[88px] flex-col items-center gap-1">
+          <div className="grid size-20 grid-cols-3 grid-rows-3 content-start justify-items-start gap-1 rounded-3xl bg-sidebar-control-surface p-2 dark:bg-foreground/12">
+            {previews.map((thread, index) => (
+              <span
+                key={thread.id}
+                aria-hidden="true"
+                data-group-preview={thread.id}
+                className="flex size-3.5 items-center justify-center overflow-hidden rounded-sm"
+              >
+                {thread.icon ?? (
+                  <span
+                    className={`flex size-full items-center justify-center text-5xs font-semibold leading-none ${previewColors[index % previewColors.length]}`}
+                  >
+                    {threadInitials(thread.title)}
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
           <input
             ref={inputRef}
             aria-label="New group name"
-            className="h-6 min-w-0 flex-1 rounded-sm border border-info/70 bg-sidebar px-1 text-sm text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-info"
+            className="h-5 w-full min-w-0 rounded-sm border border-info/70 bg-sidebar px-1 text-center text-xs text-sidebar-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-info"
             maxLength={64}
             value={props.editingName}
             onPointerDown={(event) => event.stopPropagation()}
@@ -76,16 +93,33 @@ export function SidebarThreadGroupRow(props: {
               }
             }}
           />
-        </>
+        </div>
       ) : (
         <button
           type="button"
           aria-label={`Open group ${props.name}`}
-          className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-info"
+          className="flex w-[88px] cursor-pointer flex-col items-center gap-1 rounded-md py-1 text-center text-xs text-sidebar-foreground hover:bg-sidebar-row-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-info"
           onClick={props.onOpen}
         >
-          <FolderGlyph />
-          <span className="block truncate">{props.name}</span>
+          <span className="grid size-20 grid-cols-3 grid-rows-3 content-start justify-items-start gap-1 rounded-3xl bg-sidebar-control-surface p-2 dark:bg-foreground/12">
+            {previews.map((thread, index) => (
+              <span
+                key={thread.id}
+                aria-hidden="true"
+                data-group-preview={thread.id}
+                className="flex size-3.5 items-center justify-center overflow-hidden rounded-sm"
+              >
+                {thread.icon ?? (
+                  <span
+                    className={`flex size-full items-center justify-center text-5xs font-semibold leading-none ${previewColors[index % previewColors.length]}`}
+                  >
+                    {threadInitials(thread.title)}
+                  </span>
+                )}
+              </span>
+            ))}
+          </span>
+          <span className="block max-w-full truncate">{props.name}</span>
         </button>
       )}
     </li>

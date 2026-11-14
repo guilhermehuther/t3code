@@ -44,6 +44,7 @@ import {
 import { foldSearchQuery, rankMessageMatches } from "@t3tools/shared/paletteSearch";
 import { findForMessageMatch, openThreadFindOnQuery } from "./chat/threadFindStore";
 import {
+  resolveThreadProviderStack,
   threadRuntimeCanArchive,
   type EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/models";
@@ -283,6 +284,7 @@ import {
   type SidebarSweepAction,
 } from "./sidebar/SidebarThreadRow";
 import { SidebarThreadGroupRow } from "./sidebar/SidebarThreadGroupRow";
+import { ProviderInstanceIcon } from "./chat/ProviderInstanceIcon";
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarProjectFolderHeader,
@@ -1419,6 +1421,42 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const activeGroupView = threadGroupsEnabled
     ? threadsInGroup(activeThreads, activeGroupPath)
     : { threads: activeThreads, folders: [] };
+  const groupPreviewThreads = (
+    members: readonly EnvironmentThreadShell[],
+    path: readonly string[],
+  ) =>
+    members
+      .filter(
+        (thread) =>
+          thread.groupPath !== undefined &&
+          path.every((part, index) => thread.groupPath?.[index] === part),
+      )
+      .slice(0, 9)
+      .map((thread) => {
+        const instanceId = resolveThreadProviderStack(thread).at(-1)!;
+        const provider = providerEntriesByEnvironment.get(thread.environmentId)?.get(instanceId);
+        return {
+          id: thread.id,
+          title: thread.title,
+          ...(provider === undefined
+            ? {}
+            : {
+                icon: (
+                  <ProviderInstanceIcon
+                    driverKind={provider.driverKind}
+                    displayName={provider.displayName}
+                    accentColor={provider.accentColor}
+                    acpRegistryAgentId={provider.acpRegistryAgentId}
+                    acpRegistryIconUrl={provider.acpRegistryIconUrl}
+                    size="compact"
+                    showBadge={false}
+                    className="size-3.5"
+                    iconClassName="size-3.5"
+                  />
+                ),
+              }),
+        };
+      });
 
   // Ranked across environments as the palette ranks them, so one
   // environment's list does not sit above another's better matches; rows
@@ -3872,6 +3910,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         }
                         if (projectFolders !== null && item.marker === "active-placeholder") {
                           for (const folder of projectFolders) {
+                            const folderThreads = [...folder.threads, ...folder.hiddenThreads];
                             items.push(
                               <SidebarProjectFolderHeader
                                 key={`project-folder:${folder.group.projectKey}`}
@@ -3940,6 +3979,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 <SidebarThreadGroupRow
                                   key={`project-thread-group:${folder.group.projectKey}:${[...folderPath, name].join("/")}`}
                                   name={name}
+                                  previewThreads={groupPreviewThreads(folderThreads, groupPath)}
                                   editingName={editingGroup ? groupRename.name : undefined}
                                   onEditingNameChange={(value) =>
                                     setGroupRename((current) =>
@@ -4024,6 +4064,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarThreadGroupRow
                                 key={`thread-group:${groupPath.join("/")}`}
                                 name={name}
+                                previewThreads={groupPreviewThreads(activeThreads, groupPath)}
                                 editingName={editingGroup ? groupRename.name : undefined}
                                 onEditingNameChange={(value) =>
                                   setGroupRename((current) =>
